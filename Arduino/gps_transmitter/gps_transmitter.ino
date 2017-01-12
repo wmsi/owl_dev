@@ -24,7 +24,7 @@
 #define TXPOWER       31
 
 // AES encryption (or not):
-#define ENCRYPT       true // Set to "true" to use encryption
+#define ENCRYPT       false // Set to "true" to use encryption
 #define ENCRYPTKEY    "TOPSECRETPASSWRD" // Use the same 16-byte key on all nodes
 
 // Use ACKnowledge when sending messages (or not):

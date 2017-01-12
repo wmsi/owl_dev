@@ -59,6 +59,7 @@ void setup()
 
   radio.initialize(FREQUENCY, MYNODEID, NETWORKID);
   radio.setHighPower(); // Always use this for RFM69HCW
+  radio.setPowerLevel(31);
 
   // Turn on encryption if desired:
 

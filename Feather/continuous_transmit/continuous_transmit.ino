@@ -58,7 +58,7 @@ void setup()
 //    Serial.println("LoRa radio init failed");
     while (1);
   }
-  Serial.println("LoRa radio init OK!");
+//  Serial.println("LoRa radio init OK!");
 
   // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, +13dbM
   if (!rf95.setFrequency(RF95_FREQ)) {

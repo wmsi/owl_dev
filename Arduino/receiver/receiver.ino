@@ -17,6 +17,7 @@
 // RFM69 frequency, uncomment the frequency of your module:
 //#define FREQUENCY   RF69_433MHZ
 #define FREQUENCY     RF69_915MHZ
+#define RFM69_RST     9
 
 // AES encryption (or not):
 #define ENCRYPT       true // Set to "true" to use encryption
@@ -26,8 +27,8 @@
 #define USEACK        true // Request ACKs or not
 
 // Packet sent/received indicator LED (optional):
-#define LED           9 // LED positive pin
-#define GND           8 // LED ground pin
+#define LED           8 // LED positive pin
+#define GND           7 // LED ground pin
 
 // Create a library object for our RFM69HCW module:
 RFM69 radio;
@@ -46,9 +47,17 @@ void setup()
   pinMode(GND,OUTPUT);
   digitalWrite(GND,LOW);
 
+  // Hard Reset the RFM module
+  pinMode(RFM69_RST, OUTPUT);
+  digitalWrite(RFM69_RST, HIGH);
+  delay(100);
+  digitalWrite(RFM69_RST, LOW);
+  delay(100);
+
   // Initialize the RFM69HCW:
   radio.initialize(FREQUENCY, MYNODEID, NETWORKID);
   radio.setHighPower(); // Always use this for RFM69HCW
+  radio.promiscuous(true);
 
   // Turn on encryption if desired:
   if (ENCRYPT)

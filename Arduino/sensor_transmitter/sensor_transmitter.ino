@@ -17,9 +17,10 @@
 // RFM69 frequency, uncomment the frequency of your module:
 //#define FREQUENCY   RF69_433MHZ
 #define FREQUENCY     RF69_915MHZ
+#define RFM69_RST     7
 
 // Transmission power (0-31 = 5-20 dBm)
-#define TXPOWER       1
+#define TXPOWER       31
 
 // AES encryption (or not):
 #define ENCRYPT       true // Set to "true" to use encryption
@@ -33,7 +34,7 @@
 #define GND           8 // LED ground pin
 
 // define send rate, sensor IDs and pins
-#define SENDDELAY     4000
+#define SENDDELAY     500
 
 #define LIGHTID       "01"
 #define LIGHTPIN      A0
@@ -59,6 +60,13 @@ void setup()
   digitalWrite(LED,LOW);
   pinMode(GND,OUTPUT);
   digitalWrite(GND,LOW);
+
+  // Hard Reset the RFM module
+  pinMode(RFM69_RST, OUTPUT);
+  digitalWrite(RFM69_RST, HIGH);
+  delay(100);
+  digitalWrite(RFM69_RST, LOW);
+  delay(100);
 
   // Initialize the RFM69HCW:
   radio.initialize(FREQUENCY, MYNODEID, NETWORKID);
@@ -116,8 +124,8 @@ void loop()
   }
 
   send_length = 0; // reset the packet
-  Blink(LED,10);
-    
+  Blink(LED,250);
+
   delay(SENDDELAY);
 }
 
