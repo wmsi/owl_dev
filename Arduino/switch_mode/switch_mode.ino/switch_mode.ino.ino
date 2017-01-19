@@ -53,6 +53,11 @@ const int LED[4] = {5,6,7,8};
 #define RECEIVE       1
 static bool mode;
 
+// check battery voltage
+#define VBAT          A0
+#define VMAX          3.6
+#define VMIN          2.8     // from datasheet for 3.7V, 400mAh LiPo battery
+
 RFM69 radio;
 
 void setup() {
@@ -99,6 +104,8 @@ void setup() {
     Serial.print(FREQUENCY==RF69_433MHZ ? 433 : FREQUENCY==RF69_868MHZ ? 868 : 915);
     Serial.println(" MHz");
   }
+
+  flashVoltage();
 }
 
 void loop() {
@@ -235,3 +242,24 @@ void audioFeedback(int rssi, int duration) {
   int output_freq = CENTER_FREQ + (center_rssi + rssi)*scale_factor;
   tone(SPEAKER, output_freq, duration);
 }
+
+void flashVoltage() {
+  analogReference(INTERNAL);
+  float v_raw = map(analogRead(VBAT), 0, 1023, 0, 11000)/10000.0;
+  float voltage = v_raw*(43/10);    // for a 33k-10k voltage divider
+  Serial.print("v raw: "); Serial.println(v_raw, 2);
+  Serial.print("voltage: "); Serial.println(voltage, 2);
+  int num_leds = map(voltage, VMIN, VMAX, 1, 4);
+  Serial.print("num leds: "); Serial.println(num_leds);
+
+  for(int i=num_leds-1; i>=0; i--) 
+    digitalWrite(LED[i], HIGH);
+
+  delay(1000);
+  
+  for(int i=0; i<4; i++)
+    digitalWrite(LED[i], LOW);
+}
+
+const long InternalReferenceVoltage = 1062;  // Adjust this value to your board's specific internal BG voltage
+ 

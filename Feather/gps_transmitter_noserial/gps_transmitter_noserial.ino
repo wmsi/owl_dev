@@ -20,7 +20,7 @@
 #define TXPOWER   23
 
 // define send rate, sensor IDs and pins
-#define SENDDELAY     3000
+#define SENDDELAY     500
 
 #define LIGHTID       "01"
 #define LIGHTPIN      A0

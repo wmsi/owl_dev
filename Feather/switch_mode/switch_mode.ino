@@ -87,12 +87,12 @@ void setup()
   measuredvbat /= 1024; // convert to voltage
 //  Serial.print("VBat: " ); Serial.println(measuredvbat);
 
-  if(MODE_PIN) {
+  if(digitalRead(MODE_PIN)) {
     send_mode = 1; //send
-    Serial.println("send mode");
+//    Serial.println("send mode");
   } else {
     send_mode = 0;
-    Serial.println("receive mode");
+//    Serial.println("receive mode");
   }
 
 }
@@ -146,17 +146,17 @@ void loop()
       if (rf95.recv(buf, &len))
       {
         digitalWrite(LED, HIGH);
-        RH_RF95::printBuffer("Received: ", buf, len);
-        Serial.print("Got: ");
-        Serial.println((char*)buf);
-         Serial.print("RSSI: ");
-        Serial.println(rf95.lastRssi(), DEC);
+//        RH_RF95::printBuffer("Received: ", buf, len);
+//        Serial.print("Got: ");
+//        Serial.println((char*)buf);
+//         Serial.print("RSSI: ");
+//        Serial.println(rf95.lastRssi(), DEC);
         delay(10);
         // Send a reply
         uint8_t data[] = "And hello back to you";
         rf95.send(data, sizeof(data));
         rf95.waitPacketSent();
-        Serial.println("Sent a reply");
+//        Serial.println("Sent a reply");
         digitalWrite(LED, LOW);
         audioFeedback(rf95.lastRssi());
       }
@@ -187,6 +187,6 @@ void audioFeedback(int rssi) {
   int center_rssi  = 75;
 
   int output_freq = CENTER_FREQ + (center_rssi + rssi)*scale_factor;
-  tone(SPEAKER, output_freq);
+  tone(SPEAKER, output_freq, 500);
 }
 
