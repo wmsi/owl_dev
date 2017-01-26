@@ -11,8 +11,10 @@
 
 // Addresses for this node. CHANGE THESE FOR EACH NODE!
 #define NETWORKID     0   // Must be the same for all nodes
-#define MYNODEID      1   // My node ID
-#define TONODEID      2   // Destination node ID
+//#define MYNODEID      1   // My node ID
+//#define TONODEID      2   // Destination node ID
+static int MYNODEID;
+static int TONODEID;
 
 // RFM69 frequency, uncomment the frequency of your module:
 //#define FREQUENCY   RF69_433MHZ
@@ -23,7 +25,7 @@
 #define TXPOWER       31
 
 // AES encryption (or not):
-#define ENCRYPT       true // Set to "true" to use encryption
+#define ENCRYPT       false // Set to "true" to use encryption
 #define ENCRYPTKEY    "TOPSECRETPASSWRD" // Use the same 16-byte key on all nodes
 
 // Use ACKnowledge when sending messages (or not):
@@ -63,9 +65,6 @@ RFM69 radio;
 void setup() {
   // Open a serial port so we can send keystrokes to the module:
   Serial.begin(9600);
-  Serial.print("Node ");
-  Serial.print(MYNODEID,DEC);
-  Serial.println(" ready");  
   
   // Hard Reset the RFM module
   pinMode(RFM69_RST, OUTPUT);
@@ -73,6 +72,32 @@ void setup() {
   delay(100);
   digitalWrite(RFM69_RST, LOW);
   delay(100);
+
+  // select mode to transmit or receive based on a switch
+  // on pin [MODESELECT]. This could also be moved to loop
+  // to allow for 
+  pinMode(MODESELECT, INPUT);
+  delay(250);
+  Serial.print("mode select: "); Serial.println(digitalRead(MODESELECT));
+  if(digitalRead(MODESELECT)) {
+    mode = RECEIVE;
+    MYNODEID = 1;
+    TONODEID = 2;
+    Serial.print("\nReceiving at ");
+    Serial.print(FREQUENCY==RF69_433MHZ ? 433 : FREQUENCY==RF69_868MHZ ? 868 : 915);
+    Serial.println(" MHz");
+  } else {
+    mode = TRANSMIT;
+    MYNODEID = 2;
+    TONODEID = 1;
+    Serial.print("\nTransmitting at ");
+    Serial.print(FREQUENCY==RF69_433MHZ ? 433 : FREQUENCY==RF69_868MHZ ? 868 : 915);
+    Serial.println(" MHz");
+  }
+  
+  Serial.print("Node ");
+  Serial.print(MYNODEID,DEC);
+  Serial.println(" ready");  
 
   // Initialize radio
   radio.initialize(FREQUENCY,MYNODEID,NETWORKID);
@@ -89,23 +114,8 @@ void setup() {
   }
   pinMode(SPEAKER, OUTPUT); 
 
-  // select mode to transmit or receive based on a switch
-  // on pin [MODESELECT]. This could also be moved to loop
-  // to allow for 
-  pinMode(MODESELECT, INPUT);
-  if(digitalRead(MODESELECT)) {
-    mode = RECEIVE;
-    Serial.print("\nReceiving at ");
-    Serial.print(FREQUENCY==RF69_433MHZ ? 433 : FREQUENCY==RF69_868MHZ ? 868 : 915);
-    Serial.println(" MHz");
-  } else {
-    mode = TRANSMIT;
-    Serial.print("\nTransmitting at ");
-    Serial.print(FREQUENCY==RF69_433MHZ ? 433 : FREQUENCY==RF69_868MHZ ? 868 : 915);
-    Serial.println(" MHz");
-  }
 
-  flashVoltage();
+//  flashVoltage();
 }
 
 void loop() {

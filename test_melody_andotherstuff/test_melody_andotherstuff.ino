@@ -48,6 +48,12 @@ void setup() {
   digitalWrite(9, HIGH);
   pinMode(10, OUTPUT);
   digitalWrite(10, HIGH);
+
+  float measuredvbat = analogRead(A7);
+  measuredvbat *= 2;    // we divided by 2, so multiply back
+  measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+  measuredvbat /= 1024; // convert to voltage
+  Serial.print("VBat: " ); Serial.println(measuredvbat); 
 }
 
 void loop() {
@@ -58,7 +64,7 @@ void loop() {
     // divided by the note type.
     //e.g. quarter note = 1000 / 4, eighth note = 1000/8, etc.
     int noteDuration = 1000 / noteDurations[thisNote];
-    tone(5, melody[thisNote], noteDuration);
+    tone(5, 2000, noteDuration);
 
     // to distinguish the notes, set a minimum time between them.
     // the note's duration + 30% seems to work well:

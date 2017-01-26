@@ -1,10 +1,13 @@
-// Feather9x_RX
-// -*- mode: C++ -*-
-// Example sketch showing how to create a simple messaging client (receiver)
-// with the RH_RF95 class. RH_RF95 class does not provide for addressing or
-// reliability, so you should only use RH_RF95 if you do not need the higher
-// level messaging abilities.
-// It is designed to work with the other example Feather9x_TX
+/* Owl Software for Profile School, Version 1.0
+    By Marc Bucchieri at White Mountain Science, Inc/
+
+    This sketch builds off examples for the Adafruit Feather M0 with
+  LoRa Radio, found in their hook-up guide here: 
+  https://learn.adafruit.com/adafruit-feather-m0-radio-with-lora-radio-module/overview
+  Software updates will be posted to our github repository at:
+   
+  
+*/
 
 #include <SPI.h>
 #include <RH_RF95.h>

@@ -22,7 +22,7 @@
 #define TXPOWER   23
 
 // define send rate, sensor IDs and pins
-#define SENDDELAY     1000
+#define SENDDELAY     500
 static long send_time = -1;
 
 #define LIGHTID       "01"
@@ -33,17 +33,11 @@ static long send_time = -1;
 #define TEMPPIN       A1
 #define TEMPSENSOR    false
 
-// indicator LEDs
-const int LED[4] = {9,10,11,12};
-
-// check battery voltage
-#define VBAT          A0
-#define VMAX          3.6
-#define VMIN          2.8     // from datasheet for 3.7V, 400mAh LiPo battery
-
-
 // Singleton instance of the radio driver
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
+
+// Blinky on receipt
+#define LED 13
 
 // Resonant frequency for audio feedback
 #define CENTER_FREQ 2000
@@ -55,20 +49,19 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 #define RECEIVE       1
 static bool mode;
 
-#define LCD   false
+#define LCD   true
 
 void setup() 
-{    
+{
+  pinMode(LED, OUTPUT);     
   pinMode(RFM95_RST, OUTPUT);
   pinMode(SPEAKER, OUTPUT);
   pinMode(MODESELECT, INPUT);
-  for(int i=0;i<4;i++)
-    pinMode(LED[i], OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
 
-  while (!Serial);
-  Serial.begin(9600);
-  delay(100);
+//  while (!Serial);
+//  Serial.begin(9600);
+//  delay(100);
   
   // manual reset
   digitalWrite(RFM95_RST, LOW);
@@ -92,28 +85,28 @@ void setup()
   // you can set transmitter powers from 5 to 23 dBm:
   rf95.setTxPower(23, false);
 
-//  flashVoltage();
-  
-  // set up Serial1 for the LCD
+    // check and print battery power
+  float measuredvbat = analogRead(VBATPIN);
+  measuredvbat *= 2;    // we divided by 2, so multiply back
+  measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+  measuredvbat /= 1024; // convert to voltage
+//  Serial.print("VBat: " ); Serial.println(measuredvbat);  // set up Serial1 for the LCD
+ 
   if(LCD)
     Serial1.begin(9600);
 
   // choose the mode with software
-//  digitalWrite(MODESELECT, HIGH);\
-  Serial.println("choosing mode");
+  digitalWrite(MODESELECT, LOW);
   if(digitalRead(MODESELECT)) {
-    mode = RECEIVE;
+    mode = RECEIVE; //send
     if(LCD) {
       clearLCD();
       writeLine("Receive mode",1,0);
     }
-      
-    Serial.println("receive mode");
   } else {
     mode = TRANSMIT;
-    Serial.println("transmit mode");
+//    Serial.println("transmit mode");
   }
-
 }
 
 void loop()
@@ -153,18 +146,17 @@ void loop()
       if (rf95.waitAvailableTimeout(250)) { 
         // Should be a reply message for us now   
         if (rf95.recv(buf, &len)) {
-          Serial.print("Millis: ");
-          Serial.print(send_string);
-          Serial.print("            Reply RSSI: ");
-          Serial.println(rf95.lastRssi(), DEC);
-          BlinkSS(rf95.lastRssi(), 250);    
+//          Serial.print("Millis: ");
+//          Serial.print(send_string);
+//          Serial.print("            Reply RSSI: ");
+//          Serial.println(rf95.lastRssi(), DEC);    
         } else {
-          Serial.println("Receive failed");
+//          Serial.println("Receive failed");
         }
       } else {
-        Serial.println("No reply.");
-        Blink(LED[0], 500);
+//        Serial.println("No reply.");
       }
+      Blink(LED, 500);
       
       // Maybe add code to handle a reply
       
@@ -182,13 +174,13 @@ void loop()
       uint8_t len = sizeof(buf);
       
       if (rf95.recv(buf, &len)) {
+        digitalWrite(LED, HIGH);
         String recd_string = String((char*)buf);
         RH_RF95::printBuffer("Received: ", buf, len);
 //        Serial.print("Got: ");
 //        Serial.println((char*)buf);
 //        Serial.print("RSSI: ");
 //        Serial.println(rf95.lastRssi(), DEC);
-        BlinkSS(rf95.lastRssi(), 250);
         delay(10);
         // Send a reply
         uint8_t data[] = "And hello back to you";
@@ -199,7 +191,8 @@ void loop()
           writeLine(String("RSSI:" + String(rf95.lastRssi())), 1, 4);
           writeLine(recd_string, 2, 0);
         }
-        audioFeedback(rf95.lastRssi());
+        digitalWrite(LED, LOW);
+//        audioFeedback(rf95.lastRssi());
       }
     }
   }
@@ -223,52 +216,12 @@ void Blink(byte PIN, int DELAY_MS)
   digitalWrite(PIN,LOW);
 }
 
-// Blink 4 LEDs to show signal strength
-void BlinkSS(int rssi, int delay_ms) {
-  int num_leds = 1;
-  if(rssi > -50) {
-    num_leds = 4; 
-  } else if(rssi > -70) {
-    num_leds = 3;
-  } else if(rssi > -50) {
-    num_leds = 2;
-  }
-  for(int i=num_leds-1; i>=0; i--) 
-    digitalWrite(LED[i], HIGH);
-
-  delay(delay_ms);
-  
-  for(int i=0; i<4; i++)
-    digitalWrite(LED[i], LOW);
-}
-
 void audioFeedback(int rssi) {
   int scale_factor = 10;
   int center_rssi  = 75;
 
   int output_freq = CENTER_FREQ + (center_rssi + rssi)*scale_factor;
-  tone(SPEAKER, output_freq);
-}
-
-// display the battery voltage on startup by flashing 1-4 LEDs
-void flashVoltage() {
-  // check and print battery power
-  float measuredvbat = analogRead(VBATPIN);
-  measuredvbat *= 2;    // we divided by 2, so multiply back
-  measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
-  measuredvbat /= 1024; // convert to voltage
-  Serial.print("VBat: " ); Serial.println(measuredvbat);  
-  
-  int num_leds = map(measuredvbat, VMIN, VMAX, 1, 4);
-  Serial.print("num leds: "); Serial.println(num_leds);
-
-  for(int i=num_leds-1; i>=0; i--) 
-    digitalWrite(LED[i], HIGH);
-
-  delay(1000);
-  
-  for(int i=0; i<4; i++)
-    digitalWrite(LED[i], LOW);
+  tone(SPEAKER, output_freq, 500);
 }
 
 // LCD functions
