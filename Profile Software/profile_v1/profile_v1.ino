@@ -9,21 +9,17 @@
 
     This sketch is designed for use with a modular transmitter/ receiver
   Owl. The mode of each individual Owl can be changed by sliding the 
-  switch on the inside right side of the unit, as indicated by the SELECT
+  switch on the inside left side of the unit, as indicated by the SELECT
   MODE label. After changing the mode switch the unit must be manually 
   reset (switch off then back on) for the mode to change. 
-
-  **startup differently depending on mode?
   
-    Once powered on, the Owl will flash its LEDs to indicate the remaining
-  battery voltage. (4 LEDs = full power, 3 = 75%, etc.) Then the Owl will
-  begin transmitting or listening for signals from other Owls. In transmit 
-  mode, the fourth (yellow) LED will flash every time a new message is sent
-  out. If it gets a return signal from another owl, the third LED will also
-  flash. In receive mode, the red LED will pulse slowly until the first signal
-  is received from the transmitter. Once a transmission is received, the red
-  LED will stop pulsing and 1-4 LEDs flash the signal strength of the 
-  incoming transmissions. 
+    Once powered on, the Owl will either begin transmitting or listening for 
+  signals from other Owls. In transmit mode, the fourth LED (from the left)
+  will flash every time a new message is sent out. If it gets a return signal 
+  from another owl, the third LED will also flash. In receive mode, the four
+  LEDs will flash back and forth until the first signal is received from the 
+  transmitter. Once a transmission is received, the four LEDs will stop 
+  flashing and 1-4 LEDs flash the signal strength of each incoming transmission. 
   
     The signal strength can also be indicated with the internal speaker by
   using the "hoot" feature. Simply hold down the red button in the center 
@@ -300,7 +296,7 @@ String addSensorData(String send_string, String id, float reading, int dec_place
 }
 
 /*
- * Pulse the red LED while waiting to receive the first message.
+ * Pulse the four LEDs back and forth while waiting for the first transmission.
  */
 void pulseLEDs() {
   for(int i=0; i<4; i++) {
@@ -330,7 +326,7 @@ void BlinkSS(int rssi, int delay_ms) {
     num_leds = 4; 
   } else if(rssi > -70) {
     num_leds = 3;
-  } else if(rssi > -50) {
+  } else if(rssi > -90) {
     num_leds = 2;
   }
   for(int i=num_leds-1; i>=0; i--) 
