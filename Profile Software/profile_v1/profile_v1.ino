@@ -5,14 +5,39 @@
   LoRa Radio, found in their hook-up guide here: 
   https://learn.adafruit.com/adafruit-feather-m0-radio-with-lora-radio-module/overview
   Software updates will be posted to our github repository at:
-   
+  https://github.com/wmsi/owl_dev/tree/master/Profile%20Software
+
+    This sketch is designed for use with a modular transmitter/ receiver
+  Owl. The mode of each individual Owl can be changed by sliding the 
+  switch on the inside right side of the unit, as indicated by the SELECT
+  MODE label. After changing the mode switch the unit must be manually 
+  reset (switch off then back on) for the mode to change. 
+
+  **startup differently depending on mode?
+  
+    Once powered on, the Owl will flash its LEDs to indicate the remaining
+  battery voltage. (4 LEDs = full power, 3 = 75%, etc.) Then the Owl will
+  begin transmitting or listening for signals from other Owls. In transmit 
+  mode, the fourth (yellow) LED will flash every time a new message is sent
+  out. If it gets a return signal from another owl, the third LED will also
+  flash. In receive mode, the red LED will pulse slowly until the first signal
+  is received from the transmitter. Once a transmission is received, the red
+  LED will stop pulsing and 1-4 LEDs flash the signal strength of the 
+  incoming transmissions. 
+  
+    The signal strength can also be indicated with the internal speaker by
+  using the "hoot" feature. Simply hold down the red button in the center 
+  of the Owl to hear the signal strength of incoming transmissions. The
+  beeps will increase in speed and pitch for higher signal strength (aka
+  closer) transmissions.
   
 */
 
+// include libraries for talking to the radio
 #include <SPI.h>
 #include <RH_RF95.h>
 
-/* for feather m0  */
+/* radio settings for feather m0  */
 #define RFM95_CS 8
 #define RFM95_RST 4
 #define RFM95_INT 3
@@ -20,7 +45,7 @@
 // battery voltage checker
 #define VBATPIN       A7
 
-// Change to 434.0 or other frequency, must match RX's freq!
+// radio frequency and broadcast power
 #define RF95_FREQ 915.0
 #define TXPOWER   23
 
@@ -28,6 +53,7 @@
 #define SENDDELAY     1000
 static long send_time = -1;
 
+// Define sensor IDs and pin numbers for data logging
 #define LIGHTID       "01"
 #define LIGHTPIN      A0
 #define LIGHTSENSOR   false
@@ -41,25 +67,42 @@ const int LED[4] = {9,10,11,12};
 
 // check battery voltage
 #define VBAT          A0
-#define VMAX          3.6
+#define VMAX          4.0
 #define VMIN          2.8     // from datasheet for 3.7V, 400mAh LiPo battery
 
 
-// Singleton instance of the radio driver
+// Create an object for the radio
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
-// Resonant frequency for audio feedback
+// Resonant frequency for internal frequency. Audio feedback will be 
+// centered (pitch-wise) around this frequency for maximum volume
 #define CENTER_FREQ 2000
-#define SPEAKER 5
+#define SPEAKER 5         // speaker output pin
 
-// mode select switch
+// Pin for the mode select switch
 #define MODESELECT    6
 #define TRANSMIT      0
 #define RECEIVE       1
 static bool mode;
 
+// Change this to true only if you add an LCD screen. Right now the only
+// supported screen is a 16x2 character Serial-enabled screen like this:
+// https://www.sparkfun.com/products/9066
 #define LCD   false
 
+// Change this to true only if the device will be plugged in a computer
+// with Serial monitor
+#define SERIAL false
+
+// Has the first message been received?
+static bool first_rx = false;
+
+/*
+ * Setup runs once to get the Owl woken up and ready to go. This involves
+ * setting up pins as inputs/ outputs, initalizing the radio, and activating
+ * Serial output and/ or the LCD screen. This is also where we choose the 
+ * mode as transmit/ receive and flash the LEDs to indicate battery voltage.
+ */
 void setup() 
 {    
   pinMode(RFM95_RST, OUTPUT);
@@ -69,11 +112,21 @@ void setup()
     pinMode(LED[i], OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
 
-  while (!Serial);
-  Serial.begin(9600);
-  delay(100);
-  
-  // manual reset
+  if(SERIAL) {
+    while (!Serial);
+    Serial.begin(9600);
+    delay(100);
+  }
+
+  // set up Serial1 for the LCD
+  if(LCD) {
+    Serial1.begin(9600);
+    delay(100);
+    clearLCD();
+  }
+    
+  // Reset and initialize the radio the radio, then set the transmit power
+  // as high as possible
   digitalWrite(RFM95_RST, LOW);
   delay(10);
   digitalWrite(RFM95_RST, HIGH);
@@ -83,44 +136,50 @@ void setup()
     while (1);
   }
 
-  // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, +13dbM
   if (!rf95.setFrequency(RF95_FREQ)) {
     while (1);
   }
 
-  // Defaults after init are 434.0MHz, 13dBm, Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on
-
-  // The default transmitter power is 13dBm, using PA_BOOST.
-  // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then 
-  // you can set transmitter powers from 5 to 23 dBm:
   rf95.setTxPower(23, false);
 
+  // indicate remaining voltage on the battery by flashing 1-4 LEDs
 //  flashVoltage();
-  
-  // set up Serial1 for the LCD
-  if(LCD)
-    Serial1.begin(9600);
 
-  // choose the mode with software
-//  digitalWrite(MODESELECT, HIGH);\
-  Serial.println("choosing mode");
+  // choose transmit or receive mode
+  String display_mode;
   if(digitalRead(MODESELECT)) {
     mode = RECEIVE;
-    if(LCD) {
-      clearLCD();
-      writeLine("Receive mode",1,0);
-    }
-      
-    Serial.println("receive mode");
+    display_mode = "Receive Mode";
   } else {
     mode = TRANSMIT;
-    Serial.println("transmit mode");
+    display_mode = "Transmit Mode";
   }
-
+  
+  if(LCD) 
+    writeLine(display_mode,1,0);
+  if(SERIAL)
+    Serial.println(display_mode);
 }
 
-void loop()
-{
+
+/*
+ * Once setup() is over, loop() runs on repeat until the Owl is turned off.
+ * 
+ * In Transmit mode, the Owl builds a message, sends it, and looks for a 
+ * reply from the receiver. The message usually consists of the time (in
+ * milliseconds) that the Owl has been running, data from any sensors that 
+ * are connected, and GPS location data if there is a GPS. Messages are 
+ * sent at regular intervals, with the time in between defined by the
+ * SENDDELAY constant up top.
+ * 
+ * In Receiver mode, the Owl patiently listens, pulsing the red LED, until
+ * the first message is received from the transmitter. Then the Owl flashes
+ * 1-4 LEDs each time a message is received to indicate signal strength. You
+ * can also hear signal strength via the internal speaker by pushing the red
+ * button in the center of the Owl. Beeps will become faster and higher-
+ * pitched as signal strength increases.
+ */
+void loop() {
   if(mode == TRANSMIT) {
     static String send_string;
     static int send_length = 0;
@@ -141,6 +200,7 @@ void loop()
       // add more sensors here
     
       // send transmission
+      digitalWrite(LED[3], HIGH);
       send_length = min(RH_RF95_MAX_MESSAGE_LEN, send_string.length());
       for (byte i = 0; i < send_length; i++) {
         send_buffer[i] = send_string[i];
@@ -156,27 +216,38 @@ void loop()
       if (rf95.waitAvailableTimeout(250)) { 
         // Should be a reply message for us now   
         if (rf95.recv(buf, &len)) {
-          Serial.print("Millis: ");
-          Serial.print(send_string);
-          Serial.print("            Reply RSSI: ");
-          Serial.println(rf95.lastRssi(), DEC);
-          BlinkSS(rf95.lastRssi(), 250);    
+          if(SERIAL) {
+            Serial.print("Millis: ");
+            Serial.print(send_string);
+            Serial.print("            Reply RSSI: ");
+            Serial.println(rf95.lastRssi(), DEC);  
+          } else {
+            digitalWrite(LED[2], HIGH);
+            delay(250);
+          }
         } else {
-          Serial.println("Receive failed");
+          if(SERIAL)
+            Serial.println("Receive failed");
         }
-      } else {
+      } else if(SERIAL) {
         Serial.println("No reply.");
-        Blink(LED[0], 500);
       }
-      
-      // Maybe add code to handle a reply
-      
+      digitalWrite(LED[2], LOW);
+      digitalWrite(LED[3], LOW);
     
       send_time = millis();
       send_string = "";
     }
-  } else {                // receive mode
+
+  // This next section of code handles Receive mode.
+  } else {   
+    while(!first_rx && !rf95.available()) {
+      pulseLEDs();             
+    }
+
     if (rf95.available()) {
+      first_rx = true;
+      
       if(LCD) 
         clearLCD();
       
@@ -187,10 +258,12 @@ void loop()
       if (rf95.recv(buf, &len)) {
         String recd_string = String((char*)buf);
         RH_RF95::printBuffer("Received: ", buf, len);
-//        Serial.print("Got: ");
-//        Serial.println((char*)buf);
-//        Serial.print("RSSI: ");
-//        Serial.println(rf95.lastRssi(), DEC);
+        if(SERIAL) {
+          Serial.print("Got: ");
+          Serial.println((char*)buf);
+          Serial.print("RSSI: ");
+          Serial.println(rf95.lastRssi(), DEC);
+        }
         BlinkSS(rf95.lastRssi(), 250);
         delay(10);
         // Send a reply
@@ -203,19 +276,43 @@ void loop()
           writeLine(recd_string, 2, 0);
         }
         audioFeedback(rf95.lastRssi());
+
       }
     }
   }
 }
 
-// add data from a sensor to the upcoming transmission. 
-// Transmission format is [sensor id]:[sensor value],...,[sensor value];
+/*
+ * add data from a sensor to the upcoming transmission. 
+ * Transmission format is [sensor id]:[sensor value],...,[sensor value];
+ * 
+ * send_string: existing message String
+ * id: sensor ID number
+ * reading: sensor value
+ * dec_places: decimal places to display
+ */
 String addSensorData(String send_string, String id, float reading, int dec_places) {
   send_string = String(send_string + id);
   send_string = String(send_string + ":");
   send_string = String(send_string + String(reading, dec_places));
   send_string = String(send_string + ";");
   return send_string;
+}
+
+/*
+ * Pulse the red LED while waiting to receive the first message.
+ */
+void pulseLEDs() {
+  for(int i=0; i<4; i++) {
+    digitalWrite(LED[i], HIGH);
+    delay(100);
+    digitalWrite(LED[i], LOW);
+  }
+  for(int i=2; i>0; i--) {
+    digitalWrite(LED[i], HIGH);
+    delay(100);
+    digitalWrite(LED[i], LOW);
+  }
 }
 
 // Blink an LED for a given number of ms
@@ -245,6 +342,11 @@ void BlinkSS(int rssi, int delay_ms) {
     digitalWrite(LED[i], LOW);
 }
 
+/*
+ * Beep the speaker to indicate signal strength.
+ * 
+ * rssi: signal strength in dBm (usually -20 - -120)
+ */
 void audioFeedback(int rssi) {
   int scale_factor = 10;
   int center_rssi  = 75;
@@ -260,10 +362,10 @@ void flashVoltage() {
   measuredvbat *= 2;    // we divided by 2, so multiply back
   measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
   measuredvbat /= 1024; // convert to voltage
-  Serial.print("VBat: " ); Serial.println(measuredvbat);  
-  
   int num_leds = map(measuredvbat, VMIN, VMAX, 1, 4);
-  Serial.print("num leds: "); Serial.println(num_leds);
+  
+  if(SERIAL)
+    Serial.print("VBat: " ); Serial.println(measuredvbat);  
 
   for(int i=num_leds-1; i>=0; i--) 
     digitalWrite(LED[i], HIGH);
@@ -274,7 +376,11 @@ void flashVoltage() {
     digitalWrite(LED[i], LOW);
 }
 
-// LCD functions
+/*
+ * This function get called to clear the 162 LCD screen between writing 
+ * to it. If you don't do this, new characters get written on top of the old
+ * ones and things get messy.
+ */
 void clearLCD() {
   Serial1.write(254); // move cursor to beginning of first line
   Serial1.write(128);
@@ -284,6 +390,20 @@ void clearLCD() {
   delay(50);
 }
 
+/*
+ * Use this function to write to the LCD screen. The function must be called
+ * once for each line you want to write. 
+ * 
+ * str: String to be displayed on the screen (1-16 characters)
+ * line: Line of the screen to write to (1-2)
+ * pos: position on the screen to start writing at
+ * 
+ * So if you call writeLine("Hello World!", 3, 2); 
+ * your screen would look like this:
+ * 
+ *    |                |
+ *    |  Hello World!  |
+ */
 void writeLine(String str, int line, int pos) {
   char temp[16] = "               ";
   int num_chars = str.length();
