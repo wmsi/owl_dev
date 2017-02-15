@@ -17,6 +17,7 @@
 // RFM69 frequency, uncomment the frequency of your module:
 //#define FREQUENCY   RF69_433MHZ
 #define FREQUENCY     RF69_915MHZ
+#define RFM69_RST     7
 
 // Transmission power (0-31 = 5-20 dBm)
 #define TXPOWER       31
@@ -59,6 +60,13 @@ void setup()
   digitalWrite(LED,LOW);
   pinMode(GND,OUTPUT);
   digitalWrite(GND,LOW);
+
+  // Hard Reset the RFM module
+  pinMode(RFM69_RST, OUTPUT);
+  digitalWrite(RFM69_RST, HIGH);
+  delay(100);
+  digitalWrite(RFM69_RST, LOW);
+  delay(100);
 
   // Initialize the RFM69HCW:
   radio.initialize(FREQUENCY, MYNODEID, NETWORKID);

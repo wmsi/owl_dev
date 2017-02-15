@@ -19,7 +19,7 @@ static int TONODEID;
 // RFM69 frequency, uncomment the frequency of your module:
 //#define FREQUENCY   RF69_433MHZ
 #define FREQUENCY     RF69_915MHZ
-#define RFM69_RST     9
+#define RFM69_RST     7
 
 // Transmission power (0-31 = 5-20 dBm)
 #define TXPOWER       31
@@ -32,18 +32,23 @@ static int TONODEID;
 #define USEACK        true // Request ACKs or not
 
 // define send rate, sensor IDs and pins
-#define SENDDELAY     500
+#define SENDDELAY     250
+static long send_time = -1;
+const int rssi_n = 4;
+static int rssi_q[rssi_n];
 
 #define LIGHTID       "01"
 #define LIGHTPIN      A0
-#define LIGHTSENSOR   true
+#define LIGHTSENSOR   false
 
 #define TEMPID        "02"
 #define TEMPPIN       A1
-#define TEMPSENSOR    true
+#define TEMPSENSOR    false
 
 // indicator LEDs
-const int LED[4] = {5,6,7,8};
+//const int LED[4] = {5,6,7,8};
+#define LED           9 // LED positive pin
+#define GND           8 // LED ground pin
 
 // Resonant frequency for audio feedback
 #define CENTER_FREQ 2000
@@ -60,13 +65,16 @@ static bool mode;
 #define VMAX          3.6
 #define VMIN          2.8     // from datasheet for 3.7V, 400mAh LiPo battery
 
+#define SERIAL        false
+#define LCD           true
+
 RFM69 radio;
 
 void setup() {
   // Open a serial port so we can send keystrokes to the module:
   Serial.begin(9600);
   
-  // Hard Reset the RFM module
+  // Hard Reset the RFM module (only for adafruit modules)
   pinMode(RFM69_RST, OUTPUT);
   digitalWrite(RFM69_RST, HIGH);
   delay(100);
@@ -78,7 +86,6 @@ void setup() {
   // to allow for 
   pinMode(MODESELECT, INPUT);
   delay(250);
-  Serial.print("mode select: "); Serial.println(digitalRead(MODESELECT));
   if(digitalRead(MODESELECT)) {
     mode = RECEIVE;
     MYNODEID = 1;
@@ -109,22 +116,33 @@ void setup() {
   radio.encrypt(ENCRYPTKEY);
 
   // setup LEDs and speaker as outputs
-  for(int i=0; i<4; i++) {
-    pinMode(LED[i], OUTPUT);
-  }
+//  for(int i=0; i<4; i++) {
+//    pinMode(LED[i], OUTPUT);
+//  }
+  pinMode(LED,OUTPUT);
+  digitalWrite(LED,LOW);
+  pinMode(GND,OUTPUT);
+  digitalWrite(GND,LOW);
   pinMode(SPEAKER, OUTPUT); 
 
+  for (int i = 0; i < rssi_n; i++) {
+    rssi_q[i] = 0;
+  }
 
 //  flashVoltage();
 }
 
 void loop() {
+  int rssi;
   if(mode == TRANSMIT) {
     static String send_string = "";
     static int send_length = 0;
     static char send_buffer[62];
   
     send_string = String(String(millis(), DEC) + ";");
+
+    Serial.print(send_string); Serial.print(" ");
+    
     if(LIGHTSENSOR) {
       float light_reading = analogRead(LIGHTPIN) * (1000.0/1023);
       send_string = addSensorData(send_string, LIGHTID, light_reading, 0);
@@ -139,7 +157,6 @@ void loop() {
   
     // send transmission
     send_length = send_string.length();
-  
     Serial.print("sending to node ");
     Serial.print(TONODEID, DEC);
     Serial.print(", message [");
@@ -151,24 +168,25 @@ void loop() {
   
     // There are two ways to send packets. If you want
     // acknowledgements, use sendWithRetry():
-    if (USEACK)
-    {
-      if (radio.sendWithRetry(TONODEID, send_buffer, send_length)) {
+    if (USEACK) {
+      if (radio.sendWithRetry(TONODEID, send_buffer, send_length, 1)) {
         Serial.println("ACK received!");
         Serial.print("RSSI: ");
         Serial.println(radio.RSSI);
-        BlinkSS(radio.RSSI, 250);
+//        BlinkSS(radio.RSSI, 250);
       } else
         Serial.println("no ACK received");
     } else {
       radio.send(TONODEID, send_buffer, send_length);
     }  
-    Blink(byte(LED[3]), 250);
+    Blink(LED, SENDDELAY/2);
   
     send_length = 0; // reset the packet
   
     delay(SENDDELAY);
+    
   } else {              // receive mode
+    delay(10);
     // In this section, we'll check with the RFM69HCW to see
     // if it has received any packets:
     if (radio.receiveDone()) {
@@ -187,6 +205,7 @@ void loop() {
       // smaller numbers mean higher power.
       Serial.print("], RSSI ");
       Serial.println(radio.RSSI);
+      rssi = pushRSSI(radio.RSSI);
   
       // Send an ACK if requested.
       // (You don't need this code if you're not using ACKs.)
@@ -194,8 +213,9 @@ void loop() {
         radio.sendACK();
         Serial.println("ACK sent");
       }
-      BlinkSS(radio.RSSI, 250);
-      audioFeedback(radio.RSSI, 250);
+//      BlinkSS(radio.RSSI, 250);
+      audioFeedback(rssi);
+      Blink(LED, SENDDELAY/2);
     }
   }
 }
@@ -219,23 +239,23 @@ void Blink(byte PIN, int DELAY_MS)
 }
 
 // Blink 4 LEDs to show signal strength
-void BlinkSS(int rssi, int delay_ms) {
-  int num_leds = 1;
-  if(rssi > -50) {
-    num_leds = 4; 
-  } else if(rssi > -70) {
-    num_leds = 3;
-  } else if(rssi > -50) {
-    num_leds = 2;
-  }
-  for(int i=num_leds-1; i>=0; i--) 
-    digitalWrite(LED[i], HIGH);
-
-  delay(delay_ms);
-  
-  for(int i=0; i<4; i++)
-    digitalWrite(LED[i], LOW);
-}
+//void BlinkSS(int rssi, int delay_ms) {
+//  int num_leds = 1;
+//  if(rssi > -50) {
+//    num_leds = 4; 
+//  } else if(rssi > -70) {
+//    num_leds = 3;
+//  } else if(rssi > -50) {
+//    num_leds = 2;
+//  }
+//  for(int i=num_leds-1; i>=0; i--) 
+//    digitalWrite(LED[i], HIGH);
+//
+//  delay(delay_ms);
+//  
+//  for(int i=0; i<4; i++)
+//    digitalWrite(LED[i], LOW);
+//}
 
 void audioFeedback(int rssi) {
   int scale_factor = 10;
@@ -247,28 +267,45 @@ void audioFeedback(int rssi) {
 
 void audioFeedback(int rssi, int duration) {
   int scale_factor = 10;
-  int center_rssi  = 75;
+  int center_rssi  = 85;
 
   int output_freq = CENTER_FREQ + (center_rssi + rssi)*scale_factor;
   tone(SPEAKER, output_freq, duration);
 }
 
-void flashVoltage() {
-  analogReference(INTERNAL);
-  float v_raw = map(analogRead(VBAT), 0, 1023, 0, 11000)/10000.0;
-  float voltage = v_raw*(43/10);    // for a 33k-10k voltage divider
-  Serial.print("v raw: "); Serial.println(v_raw, 2);
-  Serial.print("voltage: "); Serial.println(voltage, 2);
-  int num_leds = map(voltage, VMIN, VMAX, 1, 4);
-  Serial.print("num leds: "); Serial.println(num_leds);
+//void flashVoltage() {
+//  analogReference(INTERNAL);
+//  float v_raw = map(analogRead(VBAT), 0, 1023, 0, 11000)/10000.0;
+//  float voltage = v_raw*(43/10);    // for a 33k-10k voltage divider
+//  Serial.print("v raw: "); Serial.println(v_raw, 2);
+//  Serial.print("voltage: "); Serial.println(voltage, 2);
+//  int num_leds = map(voltage, VMIN, VMAX, 1, 4);
+//  Serial.print("num leds: "); Serial.println(num_leds);
+//
+//  for(int i=num_leds-1; i>=0; i--) 
+//    digitalWrite(LED[i], HIGH);
+//
+//  delay(1000);
+//  
+//  for(int i=0; i<4; i++)
+//    digitalWrite(LED[i], LOW);
+//}
 
-  for(int i=num_leds-1; i>=0; i--) 
-    digitalWrite(LED[i], HIGH);
 
-  delay(1000);
-  
-  for(int i=0; i<4; i++)
-    digitalWrite(LED[i], LOW);
+// average the last n rssi values
+int pushRSSI(int new_rssi) {
+  int n = 0;
+  float sum = 0;
+  for (int i = 0; i < rssi_n - 1; i++)
+    rssi_q[i] = rssi_q[i + 1];
+  rssi_q[rssi_n - 1] = new_rssi;
+  for (int i = 0; i < rssi_n; i++) {
+    if (rssi_q[i] != 0) {
+      sum += rssi_q[i];
+      n += 1;
+    }
+  }
+  return sum / n;
 }
 
 const long InternalReferenceVoltage = 1062;  // Adjust this value to your board's specific internal BG voltage

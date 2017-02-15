@@ -17,7 +17,7 @@
 // RFM69 frequency, uncomment the frequency of your module:
 //#define FREQUENCY   RF69_433MHZ
 #define FREQUENCY     RF69_915MHZ
-#define RFM69_RST     9
+#define RFM69_RST     7
 
 // AES encryption (or not):
 #define ENCRYPT       true // Set to "true" to use encryption
@@ -27,8 +27,8 @@
 #define USEACK        true // Request ACKs or not
 
 // Packet sent/received indicator LED (optional):
-#define LED           8 // LED positive pin
-#define GND           7 // LED ground pin
+#define LED           9 // LED positive pin
+#define GND           8 // LED ground pin
 
 // Create a library object for our RFM69HCW module:
 RFM69 radio;
