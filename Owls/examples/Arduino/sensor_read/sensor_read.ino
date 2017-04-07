@@ -1,3 +1,21 @@
+/* sensor_read.ino
+ *  
+ *  This sketch demos the Owl's ability to transmit and receive
+ *  sensor values. On startup, each Owl boots into transmit 
+ *  or receive mode, as determined by the MODESELECT switch.
+ *  In transme mode, sensors are activitated as defined in the 
+ *  section of code above setup() and readingas are regularly 
+ *  transmitted every SENDDELAY milliseconds while the sketch is
+ *  running. In receive mode the Owl gathers new data in the 
+ *  message String. This String could then be parsed and processed
+ *  depending on the specific application (game design, sensor
+ *  network, etc.)
+ *  
+ *  This sketch includes the basic setup procedure for the RFM69
+ *  breakout board, as discussed in Sparkfun's hookup guide:
+ * https://learn.sparkfun.com/tutorials/rfm69hcw-hookup-guide
+ */
+
 #include <RFM69.h>
 #include <SPI.h>
 
@@ -31,17 +49,17 @@ unsigned long last_send = 0;
 
 #define LIGHTID       "01"
 #define LIGHTPIN      A0
-#define LIGHTSENSOR   true
+#define LIGHTSENSOR   false
 
 #define TEMPID        "02"
 #define TEMPPIN       A1
-#define TEMPSENSOR    true
+#define TEMPSENSOR    false
 
 #define ACCELID       "03"
-#define ACCELPINX     A1
-#define ACCELPINY     A2
-#define ACCELPINZ     A3
-#define ACCEL         false
+#define ACCELPINX     A0
+#define ACCELPINY     A1
+#define ACCELPINZ     A2
+#define ACCEL         true
 
 // Create a library object for our RFM69HCW module:
 RFM69 radio;
@@ -70,6 +88,7 @@ void loop() {
       send_string = readSensors();
   
       radioSend(send_string); 
+      last_send = millis();
     }
   } else {
     // In this section, we'll check with the RFM69HCW to see
