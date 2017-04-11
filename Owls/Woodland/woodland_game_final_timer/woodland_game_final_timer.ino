@@ -48,7 +48,7 @@ const int s7sTx = 8;
 const int s7sRx = 7;
 SoftwareSerial s7s(s7sRx, s7sTx);
 unsigned long last_update = 0;
-unsigned long last_broadcast = 0;
+unsigned long last_broadcstopast = 0;
 boolean flash_state = false;
 boolean stop_display = false;
 unsigned int stop_time = 0;

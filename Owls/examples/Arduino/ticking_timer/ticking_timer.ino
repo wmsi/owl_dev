@@ -264,9 +264,9 @@ void clearDisplay()
 bool radioSend(String send_string) {
   bool ack_recd = false;
   static int send_length = 0;
-  static char send_buffer[62];
+  static char send_buffer[RF69_MAX_DATA_LEN];
 
-  send_length = min(send_string.length(),62);
+  send_length = min(send_string.length(),RF69_MAX_DATA_LEN);
   if(SERIAL) {
     Serial.print("sending to node "); Serial.print(TONODEID, DEC); Serial.print(", message: ");
     Serial.println(send_string);
