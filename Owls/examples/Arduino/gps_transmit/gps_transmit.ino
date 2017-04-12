@@ -2,9 +2,11 @@
  * This example demonstrates how to collect GPS data and broadcast it 
  * using the RFM69HCW breakout board
  */
-// Include the RFM69 and SPI libraries:
+// Include the RFM69 and SPI libraries for using the RFM board
 #include <RFM69.h>
 #include <SPI.h>
+
+// Include TinyGPS and SoftwareSerial libraries for using the GPS
 #include <TinyGPS++.h>
 #include <SoftwareSerial.h>
 
@@ -25,10 +27,6 @@
 
 // Use ACKnowledge when sending messages (or not):
 #define USEACK        true // Request ACKs or not
-
-// Packet sent/received indicator LED (optional):
-#define LED           9 // LED positive pin
-#define GND           8 // LED ground pin
 
 // SENDDELAY defines how often to send messages (1000 = 1 send/ second)
 #define SENDDELAY     1000
@@ -57,13 +55,7 @@ void setup()
   Serial.print("Node ");
   Serial.print(MYNODEID,DEC);
   Serial.println(" ready");  
-
-  // Set up the indicator LED (optional):
-  pinMode(LED,OUTPUT);
-  digitalWrite(LED,LOW);
-  pinMode(GND,OUTPUT);
-  digitalWrite(GND,LOW);
-
+  
   // Start the software serial port at the GPS's default baud
   gpsSerial.begin(GPSBAUD);
 }
@@ -86,13 +78,14 @@ void loop()
   if(got_location && millis() - send_time > SENDDELAY) {
     radioSend(send_string);
     
-    Blink(LED,10); 
     send_time = millis();
   }
 }
 
 /*
- * 
+ * Add the GPS location data to the send string. The GPS can also provide
+ * information about time, date, and altitude. For more information on 
+ * these funcitons check out TeinyGPS++.h
  */
 String addGPSData() {
   String send_string = "LOC:";
@@ -103,45 +96,9 @@ String addGPSData() {
   } else {
     send_string = String(send_string + "ERR");
   }
-
-  if(DATE) {
-    send_string = String(send_string + ";DAT:");
-    if(gps.date.isValid()) {
-      send_string = String(send_string + String(gps.date.month())); send_string = String(send_string + "/");
-      send_string = String(send_string + String(gps.date.day())); send_string = String(send_string + "/");
-      send_string = String(send_string + String(gps.date.year())); send_string = String(send_string + "; ");
-    } else {
-      send_string = String(send_string + "ERR;"); 
-    }
-  }
-
-  if (TIME) {
-    send_string = String(send_string + "TIM:");
-    if(gps.time.isValid()) {
-      if (gps.time.hour() < 10) send_string = String(send_string + "0"); 
-      send_string = String(send_string + String(gps.time.hour()));
-      send_string = String(send_string + ":");
-      if (gps.time.minute() < 10) send_string = String(send_string + "0"); 
-      send_string = String(send_string + String(gps.time.minute()));
-      send_string = String(send_string + ";");
-//      if (gps.time.second() < 10) send_string = String(send_string + "0"); 
-//      send_string = String(send_string + String(gps.time.second()));
-//      send_string = String(send_string + ";");
-    } else {
-      send_string = String(send_string + "ERR;");
-    }
-  }
+  send_string = send_string + ";";
   return send_string;
 }
-
-// Blink an LED for a given number of ms
-void Blink(byte PIN, int DELAY_MS)
-{
-  digitalWrite(PIN,HIGH);
-  delay(DELAY_MS);
-  digitalWrite(PIN,LOW);
-}
-
 
 /*
    Send out a message via the radio board. If USEACK is set to true,
@@ -195,8 +152,11 @@ bool radioSend(String send_string) {
  * Owl applications.
  *
  * Currently this sketch only contains code to run in transmit mode. 
- *   To restore mode functionality 
- * simply add mode handling in loop() (e.g. if(mode == TRANSMIT) { ... } else {...})
+ * To receive the data on a second Owl, load it with 
+ * simple_transmit_receive.ino and set the mode select switch to 
+ * receive mode. To restore mode functionality 
+ * simply add mode handling in loop(). An example of this can also be
+ * found in simple_transmit_receive.ino
  */
 void radioSetup() {
   // Initialize radio
@@ -207,5 +167,4 @@ void radioSetup() {
   // promiscuous mode allows this unit to receive all transmissions on the network
   radio.promiscuous();
   radio.encrypt(ENCRYPTKEY);
-
 }
