@@ -6,7 +6,7 @@
     notify all receivers that it has been retrieved.
 */
 
-// include libraries for GPS and LCD setup
+// include libraries for using the GPS and LCD
 #include <TinyGPS++.h>
 #include <SoftwareSerial.h>
 
@@ -14,8 +14,10 @@
 #include <RFM69.h>
 #include <SPI.h>
 
-// Use these to limit unnecessary output
-#define LCD     true
+// Use these to limit unnecessary output. Sometimes the Arduino will 
+// get confused if it tries to write to Serial or an LCD when nothing
+// is connected
+#define LCD     false
 #define SERIAL  true
 
 // Choose Arduino pins to use for software serial with the GPS and LCD
@@ -222,7 +224,12 @@ int getDistance(long lat_diff, long lng_diff) {
 
 /*
    Broadcast a message via the radio board. If USEACK is set to true,
-   wait for an acknowledgment as dictated by sendWithRetry()
+   wait for an acknowledgment as dictated by sendWithRetry(). From 
+   RFM69.h:
+   sendWithRetry(uint8_t toAddress, const void* buffer, uint8_t bufferSize, 
+                 uint8_t retries=2, uint8_t retryWaitTime=40);
+
+   return true if an ACK was received
 */
 boolean radioSend(String send_string) {
   boolean ack_recd = false;
@@ -417,6 +424,5 @@ void radioSetup() {
   // promiscuous mode allows this unit to receive all transmissions on the network
   radio.promiscuous();
   radio.encrypt(ENCRYPTKEY);
-
 }
 

@@ -85,7 +85,7 @@ void loop() {
   if(mode == TRANSMIT) {
     if(millis() - last_send > SENDDELAY) {
       send_string = String(String(millis(), DEC) + ";");
-      send_string = readSensors();
+      send_string = readSensors(send_string);
   
       radioSend(send_string); 
       last_send = millis();
@@ -110,8 +110,7 @@ void loop() {
  * of data will be necessary (i.e. map(reading,0,1023,0,newMax))
  * in order to fit all of the information into one radio transmission.
  */
-String readSensors() {
-  String send_string;
+String readSensors(String send_string) {
   if(LIGHTSENSOR) {
     String light_reading = String(map(analogRead(LIGHTPIN),0,1023,0,100));
     send_string = addSensorData(send_string, LIGHTID, light_reading);
