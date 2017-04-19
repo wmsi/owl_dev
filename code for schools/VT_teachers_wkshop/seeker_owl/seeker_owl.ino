@@ -183,12 +183,12 @@ void loop() {
 void checkProximity() {
   if (gps.location.isValid()) {
 
-    int min_distance = -1;
+    long min_distance = -1;
     int index = -1;
     for (int i = 0; i < num_waypts; i++) {
       long lat_diff = 10000 * waypt_lat_lng[i][0] - 10000 * gps.location.lat();
       long lng_diff = 10000 * waypt_lat_lng[i][1] - 10000 * gps.location.lng();
-      int distance = getDistance(lat_diff, lng_diff);
+      long distance = getDistance(lat_diff, lng_diff);
       if (min_distance == -1 || distance < min_distance) {
         min_distance = distance;
         index = i;
@@ -412,8 +412,8 @@ void radioSetup() {
     MYNODEID = 2;
     TONODEID = 1;
   }
-    if(SERIAL)
-      Serial.print(String(mode==RECEIVE ? "Receive" : "Transmit") + " mode selected");
+  if(SERIAL)
+    Serial.print(String(mode==RECEIVE ? "Receive" : "Transmit") + " mode selected");
       
   // Initialize radio
   radio.initialize(FREQUENCY, MYNODEID, NETWORKID);
