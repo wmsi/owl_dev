@@ -1,9 +1,14 @@
-/* This software is intended to be run as an example Owl activity for the
-    Woodland school. In receive mode, the Owl searches for waypoints and
-    releases a new compass (pointing toward the transmitter) at each waypoint.
-    The transmitter sits in a central location, broadcasting updates as the
+/* This software is intended to be run as an example GPS game for a
+    teachers' workshop at the Lyndon town school. In seeker mode, the 
+    Owl searches for waypoints, always displaying the distance to the 
+    nearest waypoint and emitting faster beeps (with a button press)
+    the closer you get. It then releases a new compass bearing 
+    (pointing toward the hidden Owl) at each waypoint.
+    The hidden Owl sits in a central location, broadcasting updates as the
     timer runs down. When found, a button press on the transmitter will
     notify all receivers that it has been retrieved.
+
+    The final lock code is 9536
 */
 
 // include libraries for using the GPS and LCD
@@ -69,23 +74,23 @@ TinyGPSPlus gps;
 // correspond directly to waypoints (e.g. bearing 0 released at waypoint 0, etc.)
 const int num_waypts = 7;
 const double waypt_lat_lng[num_waypts][2] = {
-  {44.545895, -71.984866},      // fire hydrant
-  {44.545933, -71.986062},      // weird corner
-  {44.546633, -71.987152},      // back corner
+  {44.545889, -71.984908},      // fire hydrant
+  {44.545912, -71.986159},      // weird corner
+  {44.546659, -71.987187},      // back corner
   {44.546968, -71.986414},      // wood chip shed
-  {44.547151, -71.984912},      // blue tunnels
-  {44.546900, -71.984490},      // climbing wall
-  {44.546206, -71.984745}       // green jxn boxes
+  {44.547221, -71.985105},      // blue tunnels
+  {44.546865, -71.984382},      // climbing wall
+  {44.546207, -71.984753}       // green jxn boxes
 };
 
 const int bearings[num_waypts] = {
-  322,
-  35,
-  97,
-  127,
-  213,
-  240,
-  297
+  324,
+  33,
+  96,
+  125,
+  207,
+  249,
+  300
 };
 
 // Addresses for this node, assigned at startup based on transmit/ receive mode
@@ -156,6 +161,7 @@ void loop() {
   if (radio.receiveDone()) {
     message = printMessage();
   }
+  
   // keep checking the GPS
   while (gpsSerial.available() > 0) {
     if (gps.encode(gpsSerial.read())) {

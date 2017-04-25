@@ -52,9 +52,9 @@ void loop()
     }
   }
   
-    send_time = millis();
-    send_string = "";
-    got_location = false;
+  send_time = millis();
+  send_string = "";
+  got_location = false;
   
 }
 

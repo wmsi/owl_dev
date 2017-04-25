@@ -1,4 +1,4 @@
-/*
+a/*
  * This example demonstrates basic transmission/ reception of
  * radio messages using the RFM board. Transmit/ receive mode
  * is designated at startup by the MODESELECT switch, and messages
@@ -42,6 +42,9 @@ RFM69 radio;
 
 // how often do we want to send messages? (in milliseconds)
 #define SENDDELAY     1000
+
+//enable or disable SERIAL for debug messages
+#define SERIAL true
 
 void setup() {
   Serial.begin(9600);
@@ -93,23 +96,26 @@ void loop() {
 */
 bool radioSend(String send_string) {
   bool ack_recd = false;
-  byte send_length = min(send_string.length(),RF69_MAX_DATA_LEN);
-  char send_buffer[RF69_MAX_DATA_LEN];
+  static int send_length = 0;
+  static char send_buffer[RF69_MAX_DATA_LEN];
 
-  Serial.print("sending to node "); Serial.print(TONODEID, DEC); Serial.print(", message: ");
-  Serial.println(send_string);
+  send_length = min(send_string.length(),RF69_MAX_DATA_LEN);
+  if(SERIAL) {
+    Serial.print("sending to node "); Serial.print(TONODEID, DEC); Serial.print(", message: ");
+    Serial.println(send_string);
+  }
   for (byte i = 0; i < send_length; i++) {
     send_buffer[i] = send_string[i];
   }
 
-  // There are two ways to send packets. If you want
-  // acknowledgements, use sendWithRetry():
   if (USEACK) {
     if (radio.sendWithRetry(TONODEID, send_buffer, send_length, 1)) {
-      Serial.println("ACK received!");
-      Serial.print("RSSI: "); Serial.println(radio.RSSI);
+      if(SERIAL) {
+        Serial.println("ACK received!");
+        Serial.print("RSSI: "); Serial.println(radio.RSSI);
+      }
       ack_recd = true;
-    } else
+    } else if(SERIAL) 
       Serial.println("No ACK received");
   } else {
     radio.send(TONODEID, send_buffer, send_length);
@@ -132,14 +138,19 @@ String printMessage() {
   }
   message[radio.DATALEN] = '\0';
 
-  Serial.println(message);
+  if (SERIAL) {
+    Serial.print("received from node ");
+    Serial.print(radio.SENDERID, DEC);
+    Serial.print(", message: "); 
+    Serial.println(message);
+  }
   if (radio.ACKRequested()) {
     radio.sendACK();
-    Serial.println("ACK sent");
+    if (SERIAL)
+      Serial.println("ACK sent");
   }
   return message;
 }
-
 
 /*
  * Initialize the radio board into transmit or receive mode.
@@ -148,29 +159,34 @@ String printMessage() {
  * mode. If you want a radio unit to only receive messages addressed
  * its node, get rid of the line radio.promiscuous().
  * 
- * The encryption option has been kept around from the Sparkfun 
- * example sketches for this board but probably isn't necessary 
- * for Owl applications.
+ * The encryption option has been kept around from the example 
+ * sketches for this board but probably isn't necessary for
+ * Owl applications.
  */
 void radioSetup() {
-  if (digitalRead(MODESELECT)) {
+  if(digitalRead(MODESELECT)) {
     mode = RECEIVE;
     MYNODEID = 1;
     TONODEID = 2;
-    Serial.println("Receive Mode Selected");
+    if(SERIAL)
+      Serial.println("Receiving at 915 MHz");
   } else {
     mode = TRANSMIT;
     MYNODEID = 2;
     TONODEID = 1;
-    Serial.println("Transmit Mode Selected");
+    if(SERIAL)
+      Serial.println("Transmitting at 915 MHz");
   }
-  
+  if(SERIAL)
+    Serial.print("Node "); Serial.print(MYNODEID,DEC); Serial.println(" ready");  
+
   // Initialize radio
-  radio.initialize(FREQUENCY, MYNODEID, NETWORKID);
+  radio.initialize(FREQUENCY,MYNODEID,NETWORKID);
   radio.setHighPower();    // Only for RFM69HCW & HW!
   radio.setPowerLevel(TXPOWER); // power output ranges from 0 (5dBm) to 31 (20dBm)
-
+  
   // promiscuous mode allows this unit to receive all transmissions on the network
   radio.promiscuous();
-  radio.encrypt(ENCRYPTKEY);
+  if(ENCRYPT)
+    radio.encrypt(ENCRYPTKEY);
 }

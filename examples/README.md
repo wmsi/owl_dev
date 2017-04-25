@@ -1,6 +1,1 @@
-These well-commented examples are meant to serve as a jumping-off point for future Owl projects. They highligt several different directions that the Owls took over the course of development. These include:
-
--Radio Direction Finding
--GPS/ compass bearing game
--Game design example from Woodland
--Sensor network rudiments
+These well-commented examples are meant to serve as a jumping-off point for future Owl projects. They highligt several different directions that the Owls took over the course of development. The files are split into two main folders, for Arduino and Feather (Owl Lite and Owl) support. These folders are meant to be complementary. However, since different use cases were developed on the two different platforms they do not exactly match up. Most significantly, the Arduino folder has greater support for GPS applications since the board naturally interfaces better with GPS and LCD.  

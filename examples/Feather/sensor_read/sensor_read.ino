@@ -58,7 +58,7 @@ unsigned long last_send = 0;
 
 // all-purpose button. In this sketch it used to send a 
 // "button pressed!" message every time it is pressed
-#define BUTTON        7
+#define BUTTON        6
  
 void setup() {
   Serial.begin(9600);

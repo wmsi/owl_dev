@@ -161,14 +161,14 @@ bool radioSend(String send_string) {
   static char send_buffer[RF69_MAX_DATA_LEN];
 
   send_length = min(send_string.length(),RF69_MAX_DATA_LEN);
-  Serial.print("sending to node "); Serial.print(TONODEID, DEC); Serial.print(", message: ");
-  Serial.println(send_string);
+  if(SERIAL) {
+    Serial.print("sending to node "); Serial.print(TONODEID, DEC); Serial.print(", message: ");
+    Serial.println(send_string);
+  }
   for (byte i = 0; i < send_length; i++) {
     send_buffer[i] = send_string[i];
   }
 
-  // There are two ways to send packets. If you want
-  // acknowledgements, use sendWithRetry():
   if (USEACK) {
     if (radio.sendWithRetry(TONODEID, send_buffer, send_length, 1)) {
       if(SERIAL) {
@@ -224,7 +224,6 @@ String printMessage() {
  * Owl applications.
  */
 void radioSetup() {
-  
   if(digitalRead(MODESELECT)) {
     mode = RECEIVE;
     MYNODEID = 1;

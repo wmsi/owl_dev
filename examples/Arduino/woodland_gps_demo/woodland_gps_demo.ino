@@ -360,7 +360,7 @@ void clearLCD() {
  */
 void writeLine(String str, int line, int pos) {
   char temp[16] = "               ";
-  int num_chars = str.length();
+  int num_chars = min(16, str.length());
   lcdSerial.write(254); // move cursor to beginning of first line
   switch (line) {
     case 2:
