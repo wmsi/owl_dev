@@ -1,4 +1,4 @@
-a/*
+/*
  * This example demonstrates basic transmission/ reception of
  * radio messages using the RFM board. Transmit/ receive mode
  * is designated at startup by the MODESELECT switch, and messages

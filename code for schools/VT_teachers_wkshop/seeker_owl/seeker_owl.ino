@@ -11,6 +11,33 @@
     The final lock code is 9536
 */
 
+// This (receiving) unit will release a new bearing for each waypoint on the list
+// when the GPS approaches within 33 ft. of that waypoint. Bearings should
+// correspond directly to waypoints (e.g. bearing 0 released at waypoint 0, etc.)
+const int NUM_WAYPTS = 7;
+const double WAYPT_LAT_LNG[NUM_WAYPTS][2] = {
+  {44.545889, -71.984908},      // fire hydrant
+  {44.545912, -71.986159},      // sw corner
+  {44.546659, -71.987187},      // w corner
+  {44.546968, -71.986414},      // silo doors
+  {44.547221, -71.985105},      // play vertex
+  {44.546865, -71.984382},      // climbing wall
+  {44.546207, -71.984753}       // green jxn boxes
+};
+
+const int bearings[NUM_WAYPTS] = {
+  324,
+  33,
+  96,
+  125,
+  207,
+  249,
+  300
+};
+
+// this corresponds directly to the 4th decimal of lat long, so 1 unit = 11 m
+const int MAX_DISTANCE = 15; 
+
 // include libraries for using the GPS and LCD
 #include <TinyGPS++.h>
 #include <SoftwareSerial.h>
@@ -26,6 +53,7 @@
 #define SERIAL  true
 
 // Choose Arduino pins to use for software serial with the GPS and LCD
+// only GPSRX and LCDTX will actually be wired up
 #define GPSRX 5
 #define GPSTX 4
 #define LCDRX 7
@@ -69,30 +97,6 @@ byte num_dots = 1;
 // Create a TinyGPS++ object called "gps"
 TinyGPSPlus gps;
 
-// This (receiving) unit will release a new bearing for each waypoint on the list
-// when the GPS approaches within 33 ft. of that waypoint. Bearings should
-// correspond directly to waypoints (e.g. bearing 0 released at waypoint 0, etc.)
-const int num_waypts = 7;
-const double waypt_lat_lng[num_waypts][2] = {
-  {44.545889, -71.984908},      // fire hydrant
-  {44.545912, -71.986159},      // weird corner
-  {44.546659, -71.987187},      // back corner
-  {44.546968, -71.986414},      // wood chip shed
-  {44.547221, -71.985105},      // blue tunnels
-  {44.546865, -71.984382},      // climbing wall
-  {44.546207, -71.984753}       // green jxn boxes
-};
-
-const int bearings[num_waypts] = {
-  324,
-  33,
-  96,
-  125,
-  207,
-  249,
-  300
-};
-
 // Addresses for this node, assigned at startup based on transmit/ receive mode
 #define NETWORKID     0   // Must be the same for all nodes
 static int MYNODEID;
@@ -117,7 +121,10 @@ RFM69 radio;
  *  will also start up LCD and Serial communication, if desired
  */
 void setup() {
-  // set up interrupts to allow for timing speaker output in the background
+  // set up interrupts to allow for timing speaker output in the background.
+  // Using interrupts allow for more precise timing control than doing this in loop
+  // for more info check out this instructables:
+  // http://www.instructables.com/id/Arduino-Timer-Interrupts/
   cli();//stop interrupts
 
   TCCR1A = 0;
@@ -161,6 +168,9 @@ void loop() {
   if (radio.receiveDone()) {
     message = printMessage();
   }
+
+  if (message != "")
+    processMessage(message);
   
   // keep checking the GPS
   while (gpsSerial.available() > 0) {
@@ -176,9 +186,6 @@ void loop() {
       Serial.print("RSSI: "); Serial.println(radio.RSSI);
     }
   }
-
-  if (message != "")
-    processMessage(message);
 }
 
 /*
@@ -187,30 +194,30 @@ void loop() {
  * nearest waypoint number and the distance on the screen.
  */
 void checkProximity() {
+  // check if we have a fix on enough satellites to provide a location
   if (gps.location.isValid()) {
 
     long min_distance = -1;
     int index = -1;
-    for (int i = 0; i < num_waypts; i++) {
-      long lat_diff = 10000 * waypt_lat_lng[i][0] - 10000 * gps.location.lat();
-      long lng_diff = 10000 * waypt_lat_lng[i][1] - 10000 * gps.location.lng();
+    for (int i = 0; i < NUM_WAYPTS; i++) {
+      long lat_diff = 10000 * WAYPT_LAT_LNG[i][0] - 10000 * gps.location.lat();
+      long lng_diff = 10000 * WAYPT_LAT_LNG[i][1] - 10000 * gps.location.lng();
       long distance = getDistance(lat_diff, lng_diff);
       if (min_distance == -1 || distance < min_distance) {
         min_distance = distance;
         index = i;
       }
     }
-
-    clearLCD();
-    post_scale = map(min_distance, 1, 15, 5, 80);
-    min_distance *= 33;
-    if (min_distance < 2) {
-      writeLine("bearing: ", 1, 0);
-      writeLine(String(bearings[index]), 2, 0);
-    } else {
-      writeLine(String("waypoint: " + String(index + 1)), 1, 0);
-      writeLine(String("distance: " + String(min_distance)), 2, 0);
+    if(min_distance > MAX_DISTANCE) {
+      index = -1;
+      min_distance = MAX_DISTANCE;
     }
+
+    // set post_scale for speaker beep frequency. This is checked in the interrupt
+    // routine to decide when to toggle the speaker on/ off
+    post_scale = map(min_distance, 1, MAX_DISTANCE, 5, 80);     
+
+    displayDistance(index, min_distance);
   } else {
     waitScreen();
   }
@@ -226,6 +233,35 @@ int getDistance(long lat_diff, long lng_diff) {
   long raw_distance = sqrt(lat_diff * lat_diff + lng_diff * lng_diff);
   int distance_m = raw_distance * 11;
   return raw_distance;
+}
+
+/*
+ *  Display a message on the screen depending on the distance to the
+ *  nearest waypoint. If we are greater than MAX_DISTANCE away from
+ *  the nearest waypoint, display a message showing that we are out 
+ *  of range. If we are within 1 unit of distance (about 11 m) from
+ *  the nearest waypoint, release a bearing. Otherwise show a number
+ *  of asterisks to represent the distance.
+ */
+void displayDistance(int index, long distance) {
+  clearLCD();
+  
+  if(index == -1) {
+    writeLine("Out of Range :(");
+  } else {
+    if (distance < 2) {
+      writeLine("bearing: ", 1, 0);
+      writeLine(String(bearings[index]), 2, 0);
+    } else {
+      int num_asterisks = map(distance,2,MAX_DISTANCE,1,8);
+      String asterisks = "";
+      for(int i=0; i<num_asterisks; i++) {
+        asterisks = asterisks + "*";
+      }
+      writeLine(String("waypt: " + String(index + 1)), 1, 0);
+      writeLine(String("dist: " + distance), 2, 0);
+    }
+  }
 }
 
 /*
@@ -359,6 +395,13 @@ void clearLCD() {
 }
 
 /*
+ * Shortcut function to write a line to the first line of the LCD
+ */
+void writeLine(String str) {
+  writeLine(str, 1, 0);
+}
+
+/*
  * Write a single line of text (String str) to the LCD screen,
  * beginning at position 'pos' of line 'line'
  * line: 1-2
@@ -405,8 +448,9 @@ ISR(TIMER1_COMPA_vect) {
 /*
  * Currently this sketch only contains code to run in receive mode, 
  * since adding support for the timer display overloads the DIO pins.
- * To restore mode functionality simply uncomment the code in setup
- * and add mode handling in loop()
+ * To restore mode functionality simply add mode handling in loop()
+ *  e.g. if(mode == TRANSMIT) { ... } else {...}
+ * 
  */
 void radioSetup() {
   if (digitalRead(MODESELECT)) {
@@ -428,6 +472,7 @@ void radioSetup() {
 
   // promiscuous mode allows this unit to receive all transmissions on the network
   radio.promiscuous();
-  radio.encrypt(ENCRYPTKEY);
+  if(ENCRYPT)
+    radio.encrypt(ENCRYPTKEY);
 }
 
